@@ -472,7 +472,7 @@ class MPose(dict):
     DEF = dict(view='side', torso=32.0, torso_len=380, neck=55.0, head=10.0, mouth=0.0,
                hand_b=(140, 560), hand_f=(200, 600), foot_b=(-60, 640), foot_f=(80, 640),
                curl=0.3, curl_b=None, finger_spread=1.0, t=0.0, body=hexc('#1a1b22'), rim=None, rim_off=(6, -3),
-               lit=1.0, sil=False, drool=0.0, teeth=1.0, breathe=1.0, jaw_jitter=0.0, red_mouth=1.0)
+               lit=1.0, sil=False, drool=0.0, teeth=1.0, breathe=1.0, jaw_jitter=0.0, red_mouth=1.0, elbows_out=False)
 
     def __getattr__(self, k):
         if k in self:
@@ -767,7 +767,7 @@ class Monster:
 
     def _arm_front(self, ctx, sh, tgt, c, MP, sx):
         tgt = clamp_reach(sh, tgt, M_UARM + M_FARM - 2)
-        el = ik2(sh, tgt, M_UARM, M_FARM, -sx)
+        el = ik2(sh, tgt, M_UARM, M_FARM, sx if MP.elbows_out else -sx)
         taper(ctx, sh, el, 40, 26, c)
         taper(ctx, el, tgt, 26, 18, c)
         fa = math.atan2(tgt[1] - el[1], tgt[0] - el[0])
