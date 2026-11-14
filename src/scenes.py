@@ -1018,9 +1018,11 @@ ESC_SMOKE = [Smoke(x, 1500, seed=80 + i, n=10, size=150, rise=30, life=10, drift
 
 
 def s_escape(ctx, t, lt, d):
-    t_out = T(8, 'выскакиваешь') - 0.35
-    t_run = T(8, 'убегаешь')
-    t_end = OFF[8] + DUR[8]
+    escape_street(ctx, t, T(8, 'выскакиваешь') - 0.35, T(8, 'убегаешь'), OFF[8] + DUR[8])
+
+
+def escape_street(ctx, t, t_out, t_run, t_end, fade_out=True, zoom_end=0.85, ground_fn=None):
+    """Hero bursts out of the apartment block door; the monster's arm misses him. Shared by episodes 1 and 2."""
     ground = 1380
     # hero path: door at x=260 -> run right
     run_t = t - t_out
@@ -1028,7 +1030,7 @@ def s_escape(ctx, t, lt, d):
     camx = max(540, hx - 120) if t < t_run + 0.6 else (hx - 120)
     zoom = 1.0
     if t > t_run:
-        zoom = lerp(1.0, 0.85, seg(t, t_run, t_end))
+        zoom = lerp(1.0, zoom_end, seg(t, t_run, t_end))
     camera(ctx, camx, 1000, zoom, shake=shake_env(t, [(t_out, 18), (t_out + 0.35, 26)]) + 2, t=t)
     night_sky(ctx, 1.0, horizon=0.62, x=camx - 1500, w=3000, y=-600, h=3000)
     glow(ctx, camx + 300, 1100, 1100, FIRE1, 0.45)
@@ -1038,7 +1040,10 @@ def s_escape(ctx, t, lt, d):
     for i, s_ in enumerate(ESC_SMOKE):
         s_.y = ground - 300
         s_.draw(ctx, t, 0.6)
-    street_ground(ctx, ground, t)
+    if ground_fn is None:
+        street_ground(ctx, ground, t)
+    else:
+        ground_fn(ctx, ground, t, camx)
     # apartment block entrance on the left
     rect(ctx, -1400, 0, 1560 + 30, ground, hexc('#141a2a'))
     for r_ in range(6):
@@ -1080,7 +1085,8 @@ def s_escape(ctx, t, lt, d):
     draw_car(ctx, 1900, ground + 260, 1.2, t, hexc('#3a3030'), burning=1.0, seed=3)
     embers(ctx, t, camx - 600, 200, 1200, 1300, n=50, seed=11)
     post(ctx, t)
-    fade(ctx, seg(t, t_end + 0.3, t_end + 1.2))
+    if fade_out:
+        fade(ctx, seg(t, t_end + 0.3, t_end + 1.2))
 
 
 def s_outro(ctx, t, lt, d):
@@ -1162,10 +1168,10 @@ def hud(ctx, t):
     ctx.restore()
 
 
-def captions(ctx, t):
+def captions(ctx, t, caps=None, fit=None):
     ctx.save()
     ctx.identity_matrix()
-    for c in CAPS:
+    for c in (CAPS if caps is None else caps):
         if not (c['start'] <= t < c['end']):
             continue
         lt = t - c['start']
@@ -1174,6 +1180,9 @@ def captions(ctx, t):
         ws = [w for w in c['words']]
         sp = 40
         widths = [text_width(ctx, w[0], size) for w in ws]
+        if fit is not None and max(widths) > fit:      # a single very long word: shrink to fit the screen
+            size = size * fit / max(widths)
+            widths = [text_width(ctx, w[0], size) for w in ws]
         # wrap into lines no wider than 940
         lines_, cur, cw = [], [], 0
         for i, w in enumerate(ws):

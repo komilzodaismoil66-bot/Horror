@@ -4,16 +4,21 @@ import sys
 import subprocess
 import multiprocessing as mp
 import cairo
+import importlib
 from engine import W, H, FPS
-from timeline import TOTAL, ROOT
 
-BUILD = os.path.join(ROOT, 'build')
+EP = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+SCENES = 'scenes' if EP == 1 else f'scenes{EP}'
+TLM = importlib.import_module('timeline' if EP == 1 else f'timeline{EP}')
+TOTAL, ROOT = TLM.TOTAL, TLM.ROOT
+BUILD = os.path.join(ROOT, 'build') if EP == 1 else os.path.join(ROOT, 'build', f'ep{EP}')
+FINAL = os.path.join(ROOT, 'output', 'okna_chast1.mp4' if EP == 1 else f'okna_chast{EP}.mp4')
 NFR = int(TOTAL * FPS)
 
 
 def work(args):
     idx, f0, f1 = args
-    import scenes
+    scenes = importlib.import_module(SCENES)
     out = os.path.join(BUILD, f'seg_{idx:02d}.mp4')
     cmd = ['ffmpeg', '-y', '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'bgra', '-s', f'{W}x{H}', '-r', str(FPS),
            '-i', '-', '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', out]
@@ -45,7 +50,7 @@ def main():
     video = os.path.join(BUILD, 'video_noaudio.mp4')
     subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', video],
                    check=True)
-    final = os.path.join(ROOT, 'output', 'okna_chast1.mp4')
+    final = FINAL
     os.makedirs(os.path.dirname(final), exist_ok=True)
     subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', video, '-i', os.path.join(BUILD, 'mix.wav'),
                     '-c:v', 'copy', '-af', 'loudnorm=I=-14:TP=-1.0:LRA=11', '-c:a', 'aac', '-b:a', '192k',
