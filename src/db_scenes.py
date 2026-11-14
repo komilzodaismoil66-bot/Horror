@@ -7,7 +7,7 @@ import cairo
 from engine import *
 from chars3 import Toon, HERO3
 from db_envs import *
-from db_timeline import STAGES, STAGE, SHOUT_AT, TOTAL, ROOT, VOICE, stage_at, fmt
+from db_timeline import STAGES, STAGE, SHOUT_AT, TOTAL, ROOT, VOICE, SPD, INTER, stage_at, fmt
 
 STYLE = dict(HERO3, hair=hexc('#4a3226'), hair_d=hexc('#352318'), top=hexc('#1d1f26'), top_d=hexc('#15161b'),
              pants=hexc('#16171c'), shoe=hexc('#f2f2f0'), skin=hexc('#e3b58e'), skin_d=hexc('#c4946c'),
@@ -65,7 +65,7 @@ def mouth_point(x=HX, y=HY, s=HS):
 
 
 def shout_rings(ctx, k, lt, origin, scale=1.0):
-    st = lt - SHOUT_AT
+    st = (lt - SHOUT_AT) * 1.25
     if st < 0:
         return
     n = 3 + k // 2
@@ -79,7 +79,7 @@ def shout_rings(ctx, k, lt, origin, scale=1.0):
 
 
 def shake_amount(k, lt):
-    st = lt - SHOUT_AT
+    st = (lt - SHOUT_AT) * SPD
     base = [0, 0, 1, 3, 7, 10, 16, 22, 28, 34, 40][k]
     if st < 0:
         return base * 0.15
@@ -125,6 +125,9 @@ def hud(ctx, k, lt):
         ctx.scale(sc, sc)
         for i, ln in enumerate(lines_):
             text(ctx, ln, 0, i * 72, 60, (1, 1, 1, a), anchor='left', outline=(0, 0, 0, a), ow=12)
+        if k >= 8:
+            text(ctx, SPACE_NOTE, 0, len(lines_) * 72 + 6, 38, (0.75, 0.85, 1, a), anchor='left',
+                 outline=(0, 0, 0, a), ow=8)
         ctx.restore()
     ctx.restore()
 
@@ -132,7 +135,7 @@ def hud(ctx, k, lt):
 # ---------------------------------------------------------------- the prehistoric world (stages 1-8)
 def world(ctx, k, lt, t):
     after = lt > SHOUT_AT
-    st = max(0.0, lt - SHOUT_AT)
+    st = max(0.0, lt - SHOUT_AT) * SPD
     z = 1.0 + 0.012 * k + 0.02 * ease_out(seg(st, 0, 1.5))
     camera(ctx, 540, 1100, z, shake=shake_amount(k, lt), t=t)
     heat = ease_io(seg(st, 0.2, 5.0)) if k == 7 else 0.0
@@ -193,25 +196,38 @@ def embers_heat(ctx, t, a):
 
 # ---------------------------------------------------------------- space (stages 9-11)
 def space_hero(ctx, k, lt, t):
-    rock_platform(ctx, 540, 1745, 300, t)
-    hero(ctx, k, lt, t, x=540, y=1735, s=1.25)
+    """After the Earth is gone the hero simply floats in open space."""
+    bob = math.sin(t * 1.3) * 18
+    ctx.save()
+    ctx.translate(540, 1560 + bob)
+    ctx.rotate(math.sin(t * 0.7) * 0.08)
+    hero(ctx, k, lt, t, x=0, y=0, s=1.25)
+    ctx.restore()
+    return (540, 1560 + bob)
+
+
+SPACE_NOTE = '*если бы в космосе был звук'
+EARTH_C, EARTH_R = (540, 1080), 430
+YOU_ON_EARTH = (540, 1080 - 430 * 0.62)          # your spot on the surface (far too small to see from here)
 
 
 def stage_planet(ctx, k, lt, t):
-    st = max(0.0, lt - SHOUT_AT)
+    st = max(0.0, lt - SHOUT_AT) * SPD
     camera(ctx, 540, 1000, 1.0 + 0.02 * seg(st, 0, 6), shake=shake_amount(k, lt), t=t)
     space_bg(ctx, t)
     crack = ease_out(seg(st, 0.2, 2.8))
     split = ease_in(seg(st, 2.6, 7.6))
-    earth(ctx, 540, 860, 330, t, heat=1.0, crack=crack, split=split)
+    earth(ctx, EARTH_C[0], EARTH_C[1], EARTH_R, t, heat=1.0, crack=crack, split=split)
     if split > 0:
         r = random.Random(11)
-        for i in range(80):
+        for i in range(90):
             a = r.uniform(0, 2 * math.pi)
-            d = 330 + split * r.uniform(100, 700)
-            circle(ctx, 540 + math.cos(a) * d, 860 + math.sin(a) * d, r.uniform(3, 10), hexc('#ff9a40'))
-    space_hero(ctx, k, lt, t)
-    shout_rings(ctx, k, lt, mouth_point(540, 1735, 1.25), 1.2)
+            d = EARTH_R + split * r.uniform(100, 800)
+            circle(ctx, EARTH_C[0] + math.cos(a) * d, EARTH_C[1] + math.sin(a) * d, r.uniform(3, 10), hexc('#ff9a40'))
+    # the scream comes from a tiny point on the surface: you
+    if split < 0.3:
+        glow(ctx, YOU_ON_EARTH[0], YOU_ON_EARTH[1], 60, hexc('#ffffff'), 0.6 * voice_open(lt) + 0.15)
+    shout_rings(ctx, k, lt, YOU_ON_EARTH, 1.3)
 
 
 PLANETS = [(160, 760, 70, '#c8502a', False, False), (880, 650, 120, '#d8a868', False, True),
@@ -219,60 +235,83 @@ PLANETS = [(160, 760, 70, '#c8502a', False, False), (880, 650, 120, '#d8a868', F
 
 
 def stage_wave(ctx, k, lt, t):
-    st = max(0.0, lt - SHOUT_AT)
+    st = max(0.0, lt - SHOUT_AT) * SPD
     camera(ctx, 540, 1000, 1.0, shake=shake_amount(k, lt), t=t)
     space_bg(ctx, t, streak=ease_in(seg(st, 0.3, 3.0)) * 2.5, cx=540, cy=1200)
     glow(ctx, -200, 300, 700, hexc('#ffd070'), 0.7)
     circle(ctx, -200, 300, 260, hexc('#fff0b0'))
     R = st * 330
+    ox, oy = 540, 1140
     for (x, y, r, c, ring, bands) in PLANETS:
-        d = math.hypot(x - 540, y - 1200)
+        d = math.hypot(x - ox, y - oy)
         hit = clamp((R - d) / 300)
         if hit < 1:
             ctx.save()
             ctx.translate(x, y)
             ctx.translate(-x, -y)
-            planet(ctx, x + (x - 540) / d * hit * 200, y + (y - 1200) / d * hit * 200, r, hexc(c), ring, bands)
+            planet(ctx, x + (x - ox) / d * hit * 200, y + (y - oy) / d * hit * 200, r, hexc(c), ring, bands)
             ctx.restore()
         if hit > 0:
             rr = random.Random(int(x))
             for i in range(40):
                 a = rr.uniform(0, 2 * math.pi)
                 dd = hit * rr.uniform(40, 360)
-                circle(ctx, x + math.cos(a) * dd + (x - 540) / d * hit * 300,
-                       y + math.sin(a) * dd + (y - 1200) / d * hit * 300, rr.uniform(3, 9),
+                circle(ctx, x + math.cos(a) * dd + (x - ox) / d * hit * 300,
+                       y + math.sin(a) * dd + (y - oy) / d * hit * 300, rr.uniform(3, 9),
                        alpha(hexc(c), 1 - hit * 0.6))
             glow(ctx, x, y, r * 3, hexc('#ffffff'), 0.6 * (1 - abs(hit - 0.3)))
     # the energy wave
     for i in range(3):
         rr_ = R - i * 90
         if rr_ > 0:
-            glow(ctx, 540, 1200, rr_ + 120, hexc('#8fd0ff'), 0.12)
-            shock_ring(ctx, 540, 1200, rr_, 40 - i * 10, 0.85 - i * 0.25, (0.75, 0.9, 1.0))
-    space_hero(ctx, k, lt, t)
-    shout_rings(ctx, k, lt, mouth_point(540, 1735, 1.25), 1.4)
+            glow(ctx, ox, oy, rr_ + 120, hexc('#8fd0ff'), 0.12)
+            shock_ring(ctx, ox, oy, rr_, 40 - i * 10, 0.85 - i * 0.25, (0.75, 0.9, 1.0))
+    p = space_hero(ctx, k, lt, t)
+    shout_rings(ctx, k, lt, (p[0], p[1] - 420), 1.4)
 
 
 def stage_galaxy(ctx, k, lt, t):
-    st = max(0.0, lt - SHOUT_AT)
+    st = max(0.0, lt - SHOUT_AT) * SPD
     camera(ctx, 540, 1000, 1.0 - 0.1 * seg(st, 0, 6), shake=shake_amount(k, lt), t=t)
     space_bg(ctx, t, streak=ease_in(seg(st, 0.2, 2.5)) * 3)
     blast = ease_in(seg(st, 1.2, 5.6))
     galaxy(ctx, 540, 760, t, blast=blast, rotation=t * 0.05)
     R = ease_in(seg(st, 0.3, 5.8)) * 2600
     if R > 0:
-        glow(ctx, 540, 1200, R + 200, hexc('#ffffff'), 0.5)
-        glow(ctx, 540, 1200, R * 0.6 + 100, hexc('#ffe8a0'), 0.7)
-        shock_ring(ctx, 540, 1200, R, 60, 0.9, (1, 0.95, 0.8))
-    space_hero(ctx, k, lt, t)
-    shout_rings(ctx, k, lt, mouth_point(540, 1735, 1.25), 1.6)
+        glow(ctx, 540, 1140, R + 200, hexc('#ffffff'), 0.5)
+        glow(ctx, 540, 1140, R * 0.6 + 100, hexc('#ffe8a0'), 0.7)
+        shock_ring(ctx, 540, 1140, R, 60, 0.9, (1, 0.95, 0.8))
+    p = space_hero(ctx, k, lt, t)
+    shout_rings(ctx, k, lt, (p[0], p[1] - 420), 1.6)
 
 
 # ---------------------------------------------------------------- frame
+def no_sound_card(ctx, lt):
+    """'In space there is no sound... but imagine there is.'"""
+    camera(ctx, 540, 960, 1.0 + 0.03 * lt / INTER, t=lt)
+    space_bg(ctx, lt + 50)
+    earth(ctx, 540, 1250, 300, lt, heat=1.0, crack=0.1)
+    ctx.identity_matrix()
+    a1 = seg(lt, 0.1, 0.4)
+    a2 = seg(lt, 1.1, 1.4)
+    text(ctx, 'В КОСМОСЕ', W / 2, 560, 104, (1, 1, 1, a1), outline=(0, 0, 0, a1), ow=14)
+    text(ctx, 'ЗВУКА НЕТ', W / 2, 680, 104, (1, 1, 1, a1), outline=(0, 0, 0, a1), ow=14)
+    text(ctx, 'НО ЕСЛИ ПРЕДСТАВИТЬ,', W / 2, 820, 62, alpha(hexc('#ffd21f'), a2), outline=(0, 0, 0, a2), ow=10)
+    text(ctx, 'ЧТО ОН ЕСТЬ...', W / 2, 900, 62, alpha(hexc('#ffd21f'), a2), outline=(0, 0, 0, a2), ow=10)
+    fade(ctx, 1 - seg(lt, 0.0, 0.3))
+    fade(ctx, seg(lt, INTER - 0.25, INTER))
+
+
 def render_frame(ctx, t):
     k, lt = stage_at(t)
     ctx.save()
     rect(ctx, 0, 0, W, H, (0, 0, 0, 1))
+    if k < 0:
+        no_sound_card(ctx, lt)
+        ctx.restore()
+        ctx.identity_matrix()
+        post(ctx, t, vignette=0.6, grain=0.035)
+        return
     ctx.save()
     if k <= 7:
         world(ctx, k, lt, t)
@@ -292,7 +331,7 @@ def render_frame(ctx, t):
     if st >= 0:
         flash(ctx, min(0.6, 0.04 * k) * math.exp(-st * 5))
     if k == 10:
-        flash(ctx, seg(lt, SHOUT_AT + 5.4, SHOUT_AT + 6.2))
-        if lt > SHOUT_AT + 6.2:
-            fade(ctx, seg(lt, STAGE - 1.2, STAGE - 0.1))
+        flash(ctx, seg(lt, SHOUT_AT + 5.4 / SPD, SHOUT_AT + 6.2 / SPD))
+        if lt > SHOUT_AT + 6.2 / SPD:
+            fade(ctx, seg(lt, STAGE - 0.8, STAGE - 0.05))
     hud(ctx, k, lt)

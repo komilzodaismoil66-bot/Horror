@@ -11,7 +11,7 @@ import numpy as np
 from scipy.io import wavfile
 from audio import SR, lp, hp, bp, norm, db, tt, reverb, IR_CITY, boom, crackle, growl, roar, step, whoosh, hiss
 from audio3 import tunnel_rumble
-from db_timeline import STAGES, STAGE, SHOUT_AT, TOTAL, ROOT, VOICE
+from db_timeline import STAGES, STAGE, SHOUT_AT, TOTAL, ROOT, VOICE, SPD, INTER, SPACE_FROM, stage_start
 
 N = int((TOTAL + 0.2) * SR)
 rng = np.random.default_rng(12)
@@ -152,11 +152,11 @@ def swell(d):
 
 def stage_fx(k):
     """(effects array (mono), level) for stage k, starting at the shout."""
-    d = STAGE - SHOUT_AT
+    d = 8.2 - 0.55                       # effects were designed for the slower cut; events now come SPD x sooner
     fx = np.zeros(int(d * SR))
 
     def put(t0, s, g):
-        i0 = int(t0 * SR)
+        i0 = int(t0 / SPD * SR)
         s = s[:max(0, len(fx) - i0)]
         fx[i0:i0 + len(s)] += s * g
     if k == 0:
@@ -219,9 +219,13 @@ def main():
     voice = np.zeros((N, 2))
     sfx = np.zeros((N, 2))
     for k in range(len(STAGES)):
-        t0 = k * STAGE + SHOUT_AT
+        t0 = stage_start(k) + SHOUT_AT
         add(voice, t0, voice_stage(v, k))
         fx = stage_fx(k)
+        if k == SPACE_FROM - 1:             # silence falls when the 'no sound in space' card appears
+            cut = int((stage_start(SPACE_FROM) - INTER - t0) * SR)
+            fx[cut:] *= 0
+            fx[max(0, cut - 4000):cut] *= np.linspace(1, 0, min(4000, cut))
         lvl = min(1.0, 0.05 * 1.75 ** k)          # destruction grows with every stage too
         fx = reverb(fx, IR_CITY, 0.25 + 0.03 * k)[:len(fx)]
         add(sfx, t0, fx * lvl * 0.8)
@@ -229,7 +233,12 @@ def main():
     env = np.convolve(np.abs(voice).max(1), np.ones(2000) / 2000, 'same')
     env = env / (env.max() + 1e-9)
     sfx *= (1 - 0.35 * env)[:, None]
+    # the card: real space is silent; a soft swell leads into the 'imagined' sound
+    t_card = stage_start(SPACE_FROM) - INTER
+    add(sfx, t_card + INTER - 1.0, swell(1.0) * 0.25, 1.0)
     mix = voice + sfx
+    i0, i1 = int(t_card * SR), int((t_card + INTER - 1.0) * SR)
+    mix[i0:i1] *= 0.0
     mix = np.tanh(mix * 1.05) / np.tanh(1.05)              # soft safety limiter, no normalisation
     mix = np.clip(mix, -0.98, 0.98)
     fo = int((TOTAL - 0.4) * SR)
@@ -238,7 +247,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     wavfile.write(os.path.join(out, 'mix.wav'), SR, (mix * 32767).astype(np.int16))
     for k in range(len(STAGES)):
-        seg = voice[int((k * STAGE + SHOUT_AT) * SR):int((k * STAGE + SHOUT_AT + 1.8) * SR)]
+        seg = voice[int((stage_start(k) + SHOUT_AT) * SR):int((stage_start(k) + SHOUT_AT + 1.8) * SR)]
         pk = 20 * np.log10(np.max(np.abs(seg)) + 1e-9)
         rms = 20 * np.log10(np.sqrt(np.mean(seg ** 2)) + 1e-9)
         print(f'{STAGES[k][0]:>6} ДБ: gain x{stage_gain(k, v):8.3f}  voice peak {pk:6.1f} dBFS  rms {rms:6.1f} dBFS')
