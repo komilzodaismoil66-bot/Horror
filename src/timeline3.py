@@ -32,9 +32,16 @@ CLIPS = [
     ('H4', 18, 22, 25, 1.4, None), ('H5', 18, 26, 35, 0.4, None), ('H6', 18, 36, 41, 1.6, None),
 ]
 DOUBLE_LINE = 'Ну что, поехали ещё раз?'
-DOUBLE_DUR = 4.9        # processed TTS line length (see voice3.py)
-DOUBLE_WORDS = [('НУ', 0.0, 0.4), ('ЧТО...', 0.4, 0.82), ('ПОЕХАЛИ...', 1.78, 2.6), ('ЕЩЁ', 3.32, 3.92), ('РАЗ?', 3.92, 4.7)]
-END_HOLD = 4.2          # hard blackout + "КОНЕЦ"
+# the double's own voice (recorded by the author): audio/train/double/*.mp3
+DOUBLE_FILE = 'double/b.mp3'
+DOUBLE_DUR = 2.2
+DOUBLE_WORDS = [('НУ', 0.0, 0.28), ('ЧТО,', 0.28, 0.5), ('ПОЕХАЛИ', 1.04, 1.46), ('ЕЩЁ', 1.46, 1.68), ('РАЗ?', 1.68, 2.1)]
+CLIP_OVERRIDE = {
+    'C11': dict(file='double/a.mp3', dur=2.6,
+                words=[('«Не', 0.0, 0.3), ('садись.', 0.3, 0.94), ('Ты', 1.34, 1.42), ('уже', 1.42, 1.64),
+                       ('здесь', 1.64, 1.9), ('был»', 1.9, 2.3)]),
+}
+END_HOLD = 5.0          # hard blackout + "КОНЕЦ"
 
 # corrected caption words (ASR mistakes / numbers); None = drop the token
 FIX = {(1, 4): 'садились', (2, 2): 'узнаёшь', (2, 9): 'её', (4, 13): '03:16.', (4, 14): None, (5, 1): 'ждёшь.',
@@ -62,6 +69,12 @@ def _clip_bounds(part, i0, i1):
 CL = {}          # id -> dict(t0, t1, part, src_a, src_b, words=[(word, gt0, gt1)])
 _t = HOOK
 for cid, part, i0, i1, gap, fx in CLIPS:
+    if cid in CLIP_OVERRIDE:
+        o = CLIP_OVERRIDE[cid]
+        words = [(w, _t + wa, _t + wb) for (w, wa, wb) in o['words']]
+        CL[cid] = dict(t0=_t, t1=_t + o['dur'], part=part, src=None, fx=fx, file=o['file'], words=words)
+        _t += o['dur'] + gap
+        continue
     a, b = _clip_bounds(part, i0, i1)
     words = []
     for i in range(i0, i1 + 1):
@@ -72,7 +85,7 @@ for cid, part, i0, i1, gap, fx in CLIPS:
         words.append((w, _t + wa - a, _t + wb - a))
     CL[cid] = dict(t0=_t, t1=_t + (b - a), part=part, src=(a, b), fx=fx, words=words)
     _t += (b - a) + gap
-T_DOUBLE = _t + 0.6           # the double's line in the last shot
+T_DOUBLE = _t + 1.5           # the double's line in the last shot (after a long, silent grin)
 T_BLACK = T_DOUBLE + DOUBLE_DUR + 0.25
 TOTAL = T_BLACK + END_HOLD
 
@@ -137,8 +150,8 @@ def caption_chunks():
         out.append(dict(start=start, end=end,
                         words=[(w.strip(',.:').upper(), a, b, _norm(w) in HOT) for (w, a, b) in ch]))
     dw = [(w, T_DOUBLE + a, T_DOUBLE + b, True) for (w, a, b) in DOUBLE_WORDS]
-    out.append(dict(start=T_DOUBLE - 0.05, end=T_DOUBLE + 1.7, words=dw[:2]))
-    out.append(dict(start=T_DOUBLE + 1.73, end=T_BLACK, words=dw[2:]))
+    out.append(dict(start=T_DOUBLE - 0.05, end=T_DOUBLE + 0.95, words=dw[:2]))
+    out.append(dict(start=T_DOUBLE + 0.99, end=T_BLACK, words=dw[2:]))
     return out
 
 

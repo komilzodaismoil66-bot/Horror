@@ -7,7 +7,7 @@ from characters import walk_pose, run_pose
 from chars3 import HERO, DOUBLE, PASS, HERO3, Toon
 from envs3 import *
 import scenes as ep1
-from timeline3 import S, E, W as WT, CL, HOOK, T_DOUBLE, T_BLACK, TOTAL, caption_chunks
+from timeline3 import S, E, W as WT, CL, HOOK, T_DOUBLE, T_BLACK, TOTAL, DOUBLE_DUR, caption_chunks
 
 CAPS = caption_chunks()
 RED = hexc('#ff2a2a')
@@ -961,7 +961,7 @@ def s_final(ctx, t, lt, d):
     for x, i in ((180, 1), (340, 3), (780, 2), (940, 5)):
         PASS[i].draw(ctx, x, CF, 0.92, dict(t=t, facing=0, sit=SEAT, lit=0.75, pale=0.35, head_down=1.0, eyes='closed',
                                             blink=False))
-    speaking = T_DOUBLE <= t <= T_DOUBLE + 4.9
+    speaking = T_DOUBLE <= t <= T_DOUBLE + DOUBLE_DUR
     DOUBLE.draw(ctx, 560, CF, 0.92, double_pose(t, head_down=1 - hu, eyes='open' if hu > 0.5 else 'closed',
                                                  mouth='grin' if hu > 0.6 else 'line', look=(0, 0.2),
                                                  watch=True, watch_glow=True))

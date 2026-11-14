@@ -16,6 +16,29 @@ def load_part(part):
     return np.frombuffer(raw, np.int16).astype(np.float64) / 32768
 
 
+def load_file(rel):
+    p = os.path.join(TL.ADIR, rel)
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', p, '-f', 's16le', '-ac', '1', '-ar', str(SR), '-'],
+                         capture_output=True).stdout
+    return np.frombuffer(raw, np.int16).astype(np.float64) / 32768
+
+
+def speech_rms(x):
+    win = int(0.05 * SR)
+    fr = [x[i:i + win] for i in range(0, len(x) - win, win)]
+    r = np.array([np.sqrt(np.mean(f ** 2)) for f in fr])
+    r = r[r > np.max(r) * 0.15]
+    return float(np.mean(r)) if len(r) else 1e-3
+
+
+def double_voice(rel, ref):
+    """The author's recording of the double: matched to the narrator's level, with the carriage echo."""
+    x = load_file(rel)
+    x = x * (speech_rms(ref) / speech_rms(x)) * 0.7
+    x = fade_edges(x, 15)
+    return reverb(x, IR_TRAIN, 0.22)[:len(x) + int(0.7 * SR)]
+
+
 def fade_edges(x, ms=12):
     n = int(SR * ms / 1000)
     if len(x) > 2 * n:

@@ -190,16 +190,20 @@ def build_voice():
     for cid, part, i0, i1, gap, fx in TL.CLIPS:
         if part not in parts:
             parts[part] = V.load_part(part)
-        a, b = CL[cid]['src']
+        c = CL[cid]
+        if c.get('file'):
+            VOX.add(c['t0'], V.double_voice(c['file'], parts[part]))
+            continue
+        a, b = c['src']
         x = V.fade_edges(parts[part][int(a * SR):int(b * SR)])
-        t0 = CL[cid]['t0']
+        t0 = c['t0']
         if fx == 'whisper':
             VOX.add(t0, V.whisper_fx(x) * 1.1)
         elif fx == 'phone':
             VOX.add(t0, V.phone_fx(x) * 0.95)
         else:
             VOX.add(t0, x)
-    VOX.add(T_DOUBLE, V.double_line() * 0.95)
+    VOX.add(T_DOUBLE, V.double_voice(TL.DOUBLE_FILE, parts[18]))
 
 
 # ---------------------------------------------------------------- sound design
