@@ -165,6 +165,11 @@ class Toon:
                 src(ctx, self.c('pupil', 1, P))
                 ctx.stroke()
                 continue
+            if e == 'squeeze':          # >  < : eyes squeezed shut while yelling
+                d = 1 if ex < 0 or (len(pts) == 2 and (ex, ey) == pts[0] and pts[0][0] < pts[1][0]) else -1
+                polyline(ctx, [(ex - d * 0.12 * r, ey - 0.11 * r), (ex + d * 0.08 * r, ey), (ex - d * 0.12 * r, ey + 0.11 * r)],
+                         5, self.c('pupil', 1, P))
+                continue
             if e == 'glow':
                 glow(ctx, ex, ey, 0.4 * r, hexc('#e8f0ff'), 0.5)
                 ellipse(ctx, ex, ey, 0.13 * r * sx, 0.13 * r, hexc('#f6faff'))
@@ -212,6 +217,13 @@ class Toon:
                 rect(ctx, x - 2.5, y - 4, 5, 6, hexc('#ece6d6'))
         elif m == 'o':
             ellipse(ctx, mx, my, 0.07 * r, 0.1 * r, mc)
+        elif m == 'shout':          # wide-open yelling mouth, size from P.mouth_open (0..1)
+            o = clamp(P.mouth_open)
+            ry = 0.05 * r + 0.2 * r * o
+            ellipse(ctx, mx, my + ry * 0.4, 0.2 * r + 0.06 * r * o, ry, hexc('#3a0d0d'))
+            if o > 0.25:
+                rect(ctx, mx - 0.15 * r, my + ry * 0.4 - ry + 1, 0.3 * r, 0.05 * r, hexc('#f4f0e8'))
+                ellipse(ctx, mx, my + ry * 0.4 + ry * 0.55, 0.12 * r, ry * 0.35, hexc('#c94a4a'))
         elif m == 'scream':
             ellipse(ctx, mx, my + 0.03 * r, 0.12 * r, 0.17 * r, mc)
         elif m == 'frown':
@@ -330,6 +342,26 @@ class Toon:
         ctx.restore()
         if self.st.get('hood') and not back:
             ellipse(ctx, x0, hip[1] - TORSO + 2, 42, 16, self.c('top_d', 1, P))
+        if self.st.get('chain') and not back:
+            n = 15
+            for i in range(n + 1):
+                a_ = math.pi * (0.12 + 0.76 * i / n)
+                px = x0 + math.cos(a_) * 40
+                py = hip[1] - TORSO + 8 + math.sin(a_) * 58
+                ctx.new_path()
+                ctx.arc(px, py, 5.2, 0, 2 * math.pi)
+                ctx.set_line_width(3.4)
+                src(ctx, mul(hexc('#d9dde4'), P.lit))
+                ctx.stroke()
+            ctx.new_path()
+            ctx.move_to(x0, hip[1] - TORSO + 66)
+            ctx.line_to(x0 + 13, hip[1] - TORSO + 82)
+            ctx.line_to(x0, hip[1] - TORSO + 100)
+            ctx.line_to(x0 - 13, hip[1] - TORSO + 82)
+            ctx.close_path()
+            src(ctx, mul(hexc('#e8ecf2'), P.lit))
+            ctx.fill()
+            circle(ctx, x0 - 4, hip[1] - TORSO + 78, 3, (1, 1, 1, 0.9))
             for sx in (-1, 1):
                 line(ctx, (x0 + sx * 12, hip[1] - TORSO + 12), (x0 + sx * 14, hip[1] - TORSO + 56), 3,
                      mul(hexc('#eef2f8'), P.lit))
@@ -388,6 +420,36 @@ class Toon:
                       self.c('hair_d', 1, P))
             ctx.restore()
         ctx.restore()
+        if self.st.get('cap') is not None and not back:
+            cc = self.c('cap', 1, P)
+            ctx.save()
+            ctx.new_path()
+            ctx.arc(0, -0.16 * r, 1.03 * r, math.pi * 1.0, math.pi * 2.0)
+            ctx.line_to(1.03 * r, -0.26 * r)
+            ctx.line_to(-1.03 * r, -0.26 * r)
+            ctx.close_path()
+            src(ctx, cc)
+            ctx.fill()
+            ellipse(ctx, -0.35 * r, -0.62 * r, 0.32 * r, 0.22 * r, mul(cc, 1.25))          # highlight
+            circle(ctx, 0, -1.08 * r, 0.09 * r, mul(cc, 0.8))                              # button
+            # baseball-cap brim pointing at the viewer (seen from below: a darker crescent)
+            ctx.new_path()
+            ctx.move_to(-0.95 * r, -0.24 * r)
+            ctx.curve_to(-0.6 * r, -0.36 * r, 0.6 * r, -0.36 * r, 0.95 * r, -0.24 * r)
+            ctx.curve_to(0.85 * r, 0.02 * r, -0.85 * r, 0.02 * r, -0.95 * r, -0.24 * r)
+            ctx.close_path()
+            src(ctx, mul(cc, 0.82))
+            ctx.fill()
+            ctx.new_path()
+            ctx.move_to(-0.88 * r, -0.14 * r)
+            ctx.curve_to(-0.5 * r, -0.02 * r, 0.5 * r, -0.02 * r, 0.88 * r, -0.14 * r)
+            ctx.set_line_width(3)
+            src(ctx, mul(cc, 0.5))
+            ctx.stroke()
+            if self.st.get('cap_logo'):
+                circle(ctx, 0, -0.56 * r, 0.17 * r, self.st['cap_logo'])
+                circle(ctx, 0, -0.56 * r, 0.09 * r, cc)
+            ctx.restore()
         if not back:
             if hd < 0.6:
                 ey = 0.02 * r + hd * 0.3 * r
@@ -423,7 +485,11 @@ class Toon:
                     hand = (hand[0] * sx, hand[1])
                 if sx > 0 and P.get('finger_lips'):
                     hand = (hc[0] - shp[0] + 2, hc[1] - shp[1] + 40)
-                el, tg = self._arm(ctx, shp, hand, sx, k, P, front_arm=(sx > 0), tremble=(tx, ty))
+                bend = sx
+                if P.get('ears'):             # palms pressed over the ears, elbows out
+                    hand = (hc[0] + sx * 0.98 * HR - shp[0], hc[1] - shp[1] + 6)
+                    bend = -sx
+                el, tg = self._arm(ctx, shp, hand, bend, k, P, front_arm=(sx > 0), tremble=(tx, ty))
                 if sx > 0 and P.get('finger_lips'):
                     line(ctx, tg, (tg[0], tg[1] - 34), 9, self.c('skin', 1, P))
                 out['hand_r' if sx > 0 else 'hand_l'] = tg

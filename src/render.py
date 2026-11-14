@@ -8,11 +8,15 @@ import importlib
 from engine import W, H, FPS
 
 EP = int(sys.argv[2]) if len(sys.argv) > 2 else 1
-SCENES = 'scenes' if EP == 1 else f'scenes{EP}'
-TLM = importlib.import_module('timeline' if EP == 1 else f'timeline{EP}')
+SCENES = {1: 'scenes', 4: 'db_scenes'}.get(EP, f'scenes{EP}')
+TLM = importlib.import_module({1: 'timeline', 4: 'db_timeline'}.get(EP, f'timeline{EP}'))
 TOTAL, ROOT = TLM.TOTAL, TLM.ROOT
-BUILD = {1: os.path.join(ROOT, 'build'), 3: os.path.join(ROOT, 'build', 'train')}.get(EP, os.path.join(ROOT, 'build', f'ep{EP}'))
-FINAL = os.path.join(ROOT, 'output', {1: 'okna_chast1.mp4', 2: 'okna_chast2.mp4', 3: 'poezd_0317.mp4'}[EP])
+BUILD = {1: os.path.join(ROOT, 'build'), 3: os.path.join(ROOT, 'build', 'train'),
+         4: os.path.join(ROOT, 'build', 'db')}.get(EP, os.path.join(ROOT, 'build', f'ep{EP}'))
+FINAL = os.path.join(ROOT, 'output', {1: 'okna_chast1.mp4', 2: 'okna_chast2.mp4', 3: 'poezd_0317.mp4',
+                                      4: 'krik_decibely.mp4'}[EP])
+# the decibel short must keep its deliberate loudness ramp: no loudness normalisation there
+AUDIO_FILTER = [] if EP == 4 else ['-af', 'loudnorm=I=-14:TP=-1.0:LRA=11']
 NFR = int(TOTAL * FPS)
 
 
@@ -53,7 +57,7 @@ def main():
     final = FINAL
     os.makedirs(os.path.dirname(final), exist_ok=True)
     subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', video, '-i', os.path.join(BUILD, 'mix.wav'),
-                    '-c:v', 'copy', '-af', 'loudnorm=I=-14:TP=-1.0:LRA=11', '-c:a', 'aac', '-b:a', '192k',
+                    '-c:v', 'copy'] + AUDIO_FILTER + ['-c:a', 'aac', '-b:a', '256k',
                     '-ar', '44100', '-shortest', '-movflags', '+faststart', final], check=True)
     print('done', final)
 
