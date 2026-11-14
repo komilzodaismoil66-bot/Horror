@@ -1175,7 +1175,7 @@ def captions(ctx, t, caps=None, fit=None):
         if not (c['start'] <= t < c['end']):
             continue
         lt = t - c['start']
-        pop = back_out(clamp(lt / 0.16), 2.2)
+        pop = max(0.01, back_out(clamp(lt / 0.16), 2.2))
         size = 92
         ws = [w for w in c['words']]
         sp = 40

@@ -4,7 +4,7 @@ import cairo
 from PIL import Image
 from engine import W, H
 import importlib
-scenes = importlib.import_module('scenes2' if os.environ.get('EP') == '2' else 'scenes')
+scenes = importlib.import_module({'2': 'scenes2', '3': 'scenes3'}.get(os.environ.get('EP', ''), 'scenes'))
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'build', 'stills')
 os.makedirs(OUT, exist_ok=True)

@@ -11,8 +11,8 @@ EP = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 SCENES = 'scenes' if EP == 1 else f'scenes{EP}'
 TLM = importlib.import_module('timeline' if EP == 1 else f'timeline{EP}')
 TOTAL, ROOT = TLM.TOTAL, TLM.ROOT
-BUILD = os.path.join(ROOT, 'build') if EP == 1 else os.path.join(ROOT, 'build', f'ep{EP}')
-FINAL = os.path.join(ROOT, 'output', 'okna_chast1.mp4' if EP == 1 else f'okna_chast{EP}.mp4')
+BUILD = {1: os.path.join(ROOT, 'build'), 3: os.path.join(ROOT, 'build', 'train')}.get(EP, os.path.join(ROOT, 'build', f'ep{EP}'))
+FINAL = os.path.join(ROOT, 'output', {1: 'okna_chast1.mp4', 2: 'okna_chast2.mp4', 3: 'poezd_0317.mp4'}[EP])
 NFR = int(TOTAL * FPS)
 
 
