@@ -26,7 +26,7 @@ def fog_group():
     cam = n.new('ShaderNodeCameraData')
     m1 = n.new('ShaderNodeMath')
     m1.operation = 'MULTIPLY'
-    m1.inputs[1].default_value = -0.028
+    m1.inputs[1].default_value = -0.016
     m1.name = 'density'
     m2 = n.new('ShaderNodeMath')
     m2.operation = 'EXPONENT'
@@ -35,7 +35,7 @@ def fog_group():
     m3.inputs[0].default_value = 1.0
     rgb = n.new('ShaderNodeRGB')
     rgb.name = 'FogColor'
-    rgb.outputs[0].default_value = (0.020, 0.028, 0.045, 1)
+    rgb.outputs[0].default_value = (0.045, 0.06, 0.09, 1)
     em = n.new('ShaderNodeEmission')
     mix = n.new('ShaderNodeMixShader')
     L = g.links
@@ -176,7 +176,7 @@ def lamps():
         bpy.ops.object.light_add(type='SPOT', location=(x + 0.7, y, 8.6))
         L = bpy.context.object
         L.name = 'lampL%d' % i
-        L.data.energy = 2600
+        L.data.energy = 6000
         L.data.color = (1.0, 0.62, 0.32)
         L.data.spot_size = math.radians(95)
         L.data.spot_blend = 0.6
@@ -288,15 +288,15 @@ def key_scale(ob, pairs):
 def impact(t, pos, size=1.0, color=(1.0, 0.85, 0.6), light=True):
     """Hit flash: bright core + expanding ring + point light pulse."""
     f = F(t)
-    m, fade = fx_mat(color, 30)
+    m, fade = fx_mat(color, 12)
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1, location=pos)
     s = bpy.context.object
     s.name = _fxname('flash')
     s.data.materials.append(m)
-    key_scale(s, [(f - 1, 0.01), (f, 0.9 * size), (f + 2, 1.4 * size), (f + 5, 0.01)])
-    key_fade(fade, [(f - 1, 0), (f, 1), (f + 4, 0)])
+    key_scale(s, [(f - 1, 0.01), (f, 0.45 * size), (f + 2, 0.7 * size), (f + 4, 0.01)])
+    key_fade(fade, [(f - 1, 0), (f, 1), (f + 3, 0)])
     rm, rfade = fx_mat(color, 12)
-    bpy.ops.mesh.primitive_torus_add(major_radius=1, minor_radius=0.06, location=pos)
+    bpy.ops.mesh.primitive_torus_add(major_radius=1, minor_radius=0.025, location=pos)
     ring = bpy.context.object
     ring.name = _fxname('ring')
     ring.rotation_euler = (random.uniform(0, 3), random.uniform(0, 3), 0)
@@ -317,7 +317,7 @@ def impact(t, pos, size=1.0, color=(1.0, 0.85, 0.6), light=True):
 def shockwave(t, pos, r_end=20, dur=0.7, color=(0.8, 0.9, 1.0), strength=10, flat=True):
     f = F(t)
     m, fade = fx_mat(color, strength)
-    bpy.ops.mesh.primitive_torus_add(major_radius=1, minor_radius=0.12, location=pos)
+    bpy.ops.mesh.primitive_torus_add(major_radius=1, minor_radius=0.03, location=pos)
     ring = bpy.context.object
     ring.name = _fxname('wave')
     ring.data.materials.append(m)
@@ -327,7 +327,7 @@ def shockwave(t, pos, r_end=20, dur=0.7, color=(0.8, 0.9, 1.0), strength=10, fla
     key_fade(fade, [(f - 1, 0), (f, 1), (f + int(dur * FPS), 0)])
 
 
-def dust(t, pos, n=8, spread=3.0, size=2.0, dur=1.6, color=(0.18, 0.17, 0.16), seed=0):
+def dust(t, pos, n=8, spread=3.0, size=2.0, dur=1.6, color=(0.32, 0.33, 0.36), seed=0):
     r = random.Random(seed)
     f = F(t)
     for i in range(n):
@@ -340,7 +340,7 @@ def dust(t, pos, n=8, spread=3.0, size=2.0, dur=1.6, color=(0.18, 0.17, 0.16), s
         key_scale(b, [(f - 1, 0.01), (f, sz * 0.4), (f + int(dur * FPS), sz)])
         b.location = end
         b.keyframe_insert('location', frame=f + int(dur * FPS))
-        key_fade(fade, [(f - 1, 0), (f + 1, 0.55), (f + int(dur * FPS), 0)])
+        key_fade(fade, [(f - 1, 0), (f + 1, 0.22), (f + int(dur * FPS), 0)])
 
 
 def debris(t, pos, n=14, speed=10, seed=0, size=0.35):
@@ -385,7 +385,7 @@ def cracks(t, center, n=9, length=14, color=(1.0, 0.06, 0.02), seed=0, dur=1.2, 
             c.location = (x, y, 0)
             c.rotation_euler = (0, 0, a)
             fs = f0 + int(k * dur * FPS / segs)
-            key_scale(c, [(fs - 1, (0.001, 1, 1)), (fs + 3, (1, 1, 1))])
+            key_scale(c, [(fs - 1, (0.0001, 0.0001, 0.0001)), (fs + 3, (1, 1, 1))])
             x, y = nx, ny
     key_fade(fade, [(f0 - 1, 1)])
     return fade

@@ -2,3 +2,8 @@ build/
 __pycache__/
 *.pyc
 rbx/__pycache__/
+rbx/frames/
+rbx/stills/
+rbx/build/
+rbx/*.log
+rbx/lineup.png

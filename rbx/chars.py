@@ -21,7 +21,7 @@ os.makedirs(TEX, exist_ok=True)
 _mats = {}
 
 
-def mat(name, color, rough=0.55, metal=0.0, emit=None, emit_strength=0.0, image=None, alpha_img=False):
+def mat(name, color, rough=0.55, metal=0.0, emit=None, emit_strength=0.0, image=None, alpha_img=False, coat=0.35):
     key = name
     if key in _mats:
         return _mats[key]
@@ -32,6 +32,12 @@ def mat(name, color, rough=0.55, metal=0.0, emit=None, emit_strength=0.0, image=
     p.inputs['Base Color'].default_value = (*color, 1)
     p.inputs['Roughness'].default_value = rough
     p.inputs['Metallic'].default_value = metal
+    for nm in ('Coat Weight', 'Clearcoat'):
+        if nm in p.inputs:
+            p.inputs[nm].default_value = coat
+            break
+    if 'Coat Roughness' in p.inputs:
+        p.inputs['Coat Roughness'].default_value = 0.12
     if emit is not None:
         p.inputs['Emission Color'].default_value = (*emit, 1)
         p.inputs['Emission Strength'].default_value = emit_strength
@@ -211,12 +217,12 @@ class R6:
         pants = mat(self.name + '_pants', hexrgb(s['pants']), 0.85)
         shoe = mat(self.name + '_shoe', hexrgb(s.get('shoe', '#111111')), 0.4)
         # torso: hips at z=0, torso spans 0..2 above the hips (root sits at hip height 2)
-        torso = self.p('torso', box(self.name + '_torso', (2, 1, 2), (0, 0, 1), top))
+        torso = self.p('torso', box(self.name + '_torso', (2, 1, 2), (0, 0, 1), top, bevel=0.12))
         # legs (origin at the hip joint)
         lw = s.get('leg_flare', 1.0)
         for side, x in (('L', -0.5), ('R', 0.5)):
             leg = self.p('leg' + side, box(self.name + '_leg' + side, (1, 1, 2), (0, 0, -1), pants,
-                                           taper_bottom=lw), torso)
+                                           taper_bottom=lw))
             leg.location = (x, 0, 0)
             sh = box(self.name + '_shoe' + side, (1.02 * lw, 1.12 * lw, 0.35), (0, -0.04, -1.83), shoe, bevel=0.08)
             sh.parent = leg
@@ -242,7 +248,7 @@ class R6:
                          mat(self.name + '_knm', (0.02, 0, 0), 0.4, emit=s['knuckles'], emit_strength=8), bevel=0.02)
                 kn.parent = arm
         # head (origin at the neck)
-        head = self.p('head', box(self.name + '_head', (1.25, 1.2, 1.2), (0, 0, 0.62), skin, bevel=0.22), torso)
+        head = self.p('head', box(self.name + '_head', (1.25, 1.2, 1.2), (0, 0, 0.62), skin, bevel=0.3), torso)
         head.location = (0, 0, 2.0)
         fimg = face_png(s['face'])
         fm = mat(self.name + '_face', (1, 1, 1), 0.6, image=fimg, alpha_img=True)
@@ -273,17 +279,24 @@ class R6:
                           mat(self.name + '_lapm', hexrgb('#1c1c20'), 0.4), bevel=0.0)
                 lap.rotation_euler = (0, sx * 0.35, 0)
                 lap.parent = torso
-            hair = mat(self.name + '_hair', hexrgb('#6b4321'), 0.6)
-            hair_d = mat(self.name + '_hair_d', hexrgb('#4a2c14'), 0.6)
-            cap = box(self.name + '_haircap', (1.32, 1.28, 0.5), (0, 0.04, 1.15), hair, bevel=0.2)
+            hair = mat(self.name + '_hair', hexrgb('#7a4a22'), 0.45)
+            hair_d = mat(self.name + '_hair_d', hexrgb('#4f2d12'), 0.45)
+            hair_l = mat(self.name + '_hair_l', hexrgb('#a06a35'), 0.4)
+            cap = box(self.name + '_haircap', (1.36, 1.32, 0.46), (0, 0.05, 1.13), hair, bevel=0.2)
             cap.parent = head
-            for i in range(9):          # swept-back quiff strands
-                x = -0.5 + i * 0.125
-                st = blob(self.name + '_strand%d' % i, (x, -0.35 + r.uniform(-0.05, 0.05), 1.42),
-                          (0.16, 0.55, 0.16), hair if i % 2 else hair_d, rot=(-0.9, 0, r.uniform(-0.15, 0.15)))
-                st.parent = head
+            back = blob(self.name + '_hairback', (0, 0.3, 1.2), (0.72, 0.5, 0.42), hair_d)
+            back.parent = head
+            for i in range(5):          # quiff: thick locks rising at the front and swept back
+                x = -0.48 + i * 0.24
+                lk = blob(self.name + '_lock%d' % i, (x, -0.38, 1.5 + 0.06 * math.sin(i * 1.7)),
+                          (0.17, 0.48, 0.24), (hair, hair_l, hair_d)[i % 3], rot=(-0.75, 0, (i - 2) * 0.08))
+                lk.parent = head
+            for i in range(4):
+                lk = blob(self.name + '_top%d' % i, (-0.36 + i * 0.24, 0.05, 1.5), (0.16, 0.5, 0.18),
+                          (hair_d, hair)[i % 2], rot=(-1.25, 0, 0))
+                lk.parent = head
             for sx in (-1, 1):
-                side = box(self.name + '_side%d' % sx, (0.1, 0.9, 0.55), (sx * 0.66, 0.1, 0.95), hair, bevel=0.05)
+                side = box(self.name + '_side%d' % sx, (0.12, 0.95, 0.6), (sx * 0.66, 0.08, 0.92), hair, bevel=0.06)
                 side.parent = head
         elif kind == 'emo':
             hair = mat(self.name + '_hair', hexrgb('#0b0b0e'), 0.3)
