@@ -337,7 +337,7 @@ def dust(t, pos, n=8, spread=3.0, size=2.0, dur=1.6, color=(0.32, 0.33, 0.36), s
         b.keyframe_insert('location', frame=f - 1)
         end = (p[0] + r.uniform(-1, 1) * spread, p[1] + r.uniform(-1, 1) * spread, p[2] + r.uniform(0.3, 1.8))
         sz = size * r.uniform(0.6, 1.3)
-        key_scale(b, [(f - 1, 0.01), (f, sz * 0.4), (f + int(dur * FPS), sz)])
+        key_scale(b, [(f - 1, 0.001), (f, sz * 0.4), (f + int(dur * FPS), sz), (f + int(dur * FPS) + 1, 0.001)])
         b.location = end
         b.keyframe_insert('location', frame=f + int(dur * FPS))
         key_fade(fade, [(f - 1, 0), (f + 1, 0.22), (f + int(dur * FPS), 0)])
@@ -399,7 +399,7 @@ def smoke_cloud(t0, t1, center, n=26, radius=7, color=(0.06, 0.06, 0.07), seed=0
                     r.uniform(0.5, 6)))
         b = blob(_fxname('smk'), p, (1, 1, 1), m)
         sz = r.uniform(2.5, 4.5)
-        key_scale(b, [(F(t0), sz * 0.7), (F(t1), sz * 1.3)])
+        key_scale(b, [(F(t0) - 2, 0.001), (F(t0) - 1, sz * 0.7), (F(t1), sz * 1.3), (F(t1) + 1, 0.001)])
         b.keyframe_insert('location', frame=F(t0))
         b.location = p + Vector((r.uniform(-2, 2), r.uniform(-1, 1), rise))
         b.keyframe_insert('location', frame=F(t1))
