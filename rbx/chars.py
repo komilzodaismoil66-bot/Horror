@@ -21,7 +21,8 @@ os.makedirs(TEX, exist_ok=True)
 _mats = {}
 
 
-def mat(name, color, rough=0.55, metal=0.0, emit=None, emit_strength=0.0, image=None, alpha_img=False, coat=0.35):
+def mat(name, color, rough=0.55, metal=0.0, emit=None, emit_strength=0.0, image=None, alpha_img=False, coat=1.0):
+    rough = min(rough, 0.42) if image is None else rough
     key = name
     if key in _mats:
         return _mats[key]
@@ -37,7 +38,7 @@ def mat(name, color, rough=0.55, metal=0.0, emit=None, emit_strength=0.0, image=
             p.inputs[nm].default_value = coat
             break
     if 'Coat Roughness' in p.inputs:
-        p.inputs['Coat Roughness'].default_value = 0.12
+        p.inputs['Coat Roughness'].default_value = 0.08
     if emit is not None:
         p.inputs['Emission Color'].default_value = (*emit, 1)
         p.inputs['Emission Strength'].default_value = emit_strength
@@ -78,7 +79,7 @@ def box(name, size, offset=(0, 0, 0), material=None, bevel=0.07, taper_bottom=1.
     if bevel > 0:
         md = ob.modifiers.new('bev', 'BEVEL')
         md.width = bevel
-        md.segments = 3
+        md.segments = 4
         md.limit_method = 'NONE'
     for p in ob.data.polygons:
         p.use_smooth = True
@@ -104,6 +105,53 @@ def plane(name, w, h, loc, rot=(math.pi / 2, 0, 0), material=None):
     ob.rotation_euler = rot
     if material:
         ob.data.materials.append(material)
+    return ob
+
+
+def cyl_head(name, r, h, zc, material, bevel=0.2):
+    """Classic toy head: a cylinder with rounded rims (origin at the neck)."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=40, radius1=r, radius2=r, depth=h)
+    for v in bm.verts:
+        v.co.z += zc
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    ob.data.materials.append(material)
+    md = ob.modifiers.new('bev', 'BEVEL')
+    md.width = bevel
+    md.segments = 5
+    md.limit_method = 'ANGLE'
+    md.angle_limit = math.radians(60)
+    for p in ob.data.polygons:
+        p.use_smooth = True
+    return ob
+
+
+def curved_face(name, r, w, h, zc, material, n=14):
+    """Face decal wrapped around the front (-Y) of the cylinder head."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new()
+    a = w / r / 2
+    cols = []
+    for i in range(n + 1):
+        t = -a + 2 * a * i / n
+        x, y = math.sin(t) * (r + 0.006), -math.cos(t) * (r + 0.006)
+        cols.append((bm.verts.new((x, y, zc - h / 2)), bm.verts.new((x, y, zc + h / 2)), i / n))
+    for (b0, t0, u0), (b1, t1, u1) in zip(cols, cols[1:]):
+        f = bm.faces.new((b0, b1, t1, t0))
+        for l, (u, v) in zip(f.loops, ((u0, 0), (u1, 0), (u1, 1), (u0, 1))):
+            l[uv].uv = (u, v)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(ob)
+    ob.data.materials.append(material)
+    for p in ob.data.polygons:
+        p.use_smooth = True
     return ob
 
 
@@ -154,13 +202,14 @@ def face_png(kind):
     d = ImageDraw.Draw(im)
     k = (20, 20, 22, 255)
     if kind == 'smirk':          # the suit guy: sharp brows, side-eye smirk
-        d.polygon([(110, 175), (230, 150), (235, 175), (115, 200)], fill=k)
-        d.polygon([(285, 165), (405, 160), (400, 185), (285, 190)], fill=k)
-        d.ellipse((150, 215, 205, 255), fill=k)
-        d.ellipse((310, 210, 365, 250), fill=k)
-        d.ellipse((170, 220, 186, 236), fill=(255, 255, 255, 255))
-        d.ellipse((330, 216, 346, 232), fill=(255, 255, 255, 255))
-        d.line([(195, 360), (270, 368), (340, 345), (365, 325)], fill=k, width=12, joint='curve')
+        d.polygon([(95, 150), (235, 118), (242, 152), (102, 186)], fill=k)
+        d.polygon([(278, 138), (418, 130), (414, 164), (280, 170)], fill=k)
+        for (x0, y0) in ((128, 196), (300, 190)):
+            d.ellipse((x0, y0, x0 + 96, y0 + 74), fill=(250, 250, 250, 255), outline=k, width=9)
+            d.ellipse((x0 + 34, y0 + 16, x0 + 80, y0 + 62), fill=k)
+            d.ellipse((x0 + 44, y0 + 22, x0 + 58, y0 + 36), fill=(255, 255, 255, 255))
+            d.line([(x0 - 2, y0 + 18), (x0 + 98, y0 + 14)], fill=k, width=14)
+        d.line([(185, 372), (270, 384), (345, 358), (378, 330)], fill=k, width=15, joint='curve')
         d.line([(365, 325), (378, 312)], fill=k, width=9)
         d.line([(215, 300), (240, 300)], fill=(60, 60, 60, 160), width=6)
     elif kind == 'teeth':        # the emo guy: angry eyes, clenched teeth
@@ -211,30 +260,30 @@ class R6:
         root.empty_display_size = 0.5
         root.rotation_mode = 'XYZ'
         self.root = root
-        skin = mat(self.name + '_skin', hexrgb(s['skin']), 0.5)
+        skin = mat(self.name + '_skin', hexrgb(s['skin']), 0.3)
         top = mat(self.name + '_top', hexrgb(s['top']), s.get('top_rough', 0.75))
         sleeve = mat(self.name + '_sleeve', hexrgb(s.get('sleeve', s['top'])), 0.75)
         pants = mat(self.name + '_pants', hexrgb(s['pants']), 0.85)
         shoe = mat(self.name + '_shoe', hexrgb(s.get('shoe', '#111111')), 0.4)
         # torso: hips at z=0, torso spans 0..2 above the hips (root sits at hip height 2)
-        torso = self.p('torso', box(self.name + '_torso', (2, 1, 2), (0, 0, 1), top, bevel=0.12))
+        torso = self.p('torso', box(self.name + '_torso', (2, 1, 2), (0, 0, 1), top, bevel=0.16, taper_bottom=0.9))
         # legs (origin at the hip joint)
         lw = s.get('leg_flare', 1.0)
         for side, x in (('L', -0.5), ('R', 0.5)):
             leg = self.p('leg' + side, box(self.name + '_leg' + side, (1, 1, 2), (0, 0, -1), pants,
-                                           taper_bottom=lw))
+                                           taper_bottom=lw, bevel=0.12))
             leg.location = (x, 0, 0)
             sh = box(self.name + '_shoe' + side, (1.02 * lw, 1.12 * lw, 0.35), (0, -0.04, -1.83), shoe, bevel=0.08)
             sh.parent = leg
         # arms (origin at the shoulder joint)
         for side, x in (('L', -1.5), ('R', 1.5)):
             if s.get('long_sleeves', True):
-                arm = self.p('arm' + side, box(self.name + '_arm' + side, (1, 1, 1.45), (0, 0, -0.63), sleeve), torso)
+                arm = self.p('arm' + side, box(self.name + '_arm' + side, (1, 1, 1.45), (0, 0, -0.63), sleeve, bevel=0.14), torso)
             else:
-                arm = self.p('arm' + side, box(self.name + '_arm' + side, (1, 1, 2), (0, 0, -0.9), skin), torso)
+                arm = self.p('arm' + side, box(self.name + '_arm' + side, (1, 1, 2), (0, 0, -0.9), skin, bevel=0.16), torso)
             arm.location = (x, 0, 1.9)
             if s.get('long_sleeves', True):
-                hand = box(self.name + '_hand' + side, (0.96, 0.96, 0.6), (0, 0, -1.6), skin, bevel=0.12)
+                hand = box(self.name + '_hand' + side, (0.96, 0.96, 0.6), (0, 0, -1.6), skin, bevel=0.2)
                 hand.parent = arm
                 if s.get('cuffs'):
                     cuff = box(self.name + '_cuff' + side, (1.03, 1.03, 0.16), (0, 0, -1.3),
@@ -248,11 +297,11 @@ class R6:
                          mat(self.name + '_knm', (0.02, 0, 0), 0.4, emit=s['knuckles'], emit_strength=8), bevel=0.02)
                 kn.parent = arm
         # head (origin at the neck)
-        head = self.p('head', box(self.name + '_head', (1.25, 1.2, 1.2), (0, 0, 0.62), skin, bevel=0.3), torso)
+        head = self.p('head', cyl_head(self.name + '_head', 0.63, 1.2, 0.62, skin), torso)
         head.location = (0, 0, 2.0)
         fimg = face_png(s['face'])
         fm = mat(self.name + '_face', (1, 1, 1), 0.6, image=fimg, alpha_img=True)
-        fp = plane(self.name + '_facepl', 1.05, 1.05, (0, -0.605, 0.62), (math.pi / 2, 0, 0), fm)
+        fp = curved_face(self.name + '_facepl', 0.63, 1.05, 1.05, 0.62, fm)
         fp.parent = head
         self.build_details(torso, head)
         root.location = (0, 0, 2)
@@ -286,17 +335,17 @@ class R6:
             cap.parent = head
             back = blob(self.name + '_hairback', (0, 0.3, 1.2), (0.72, 0.5, 0.42), hair_d)
             back.parent = head
-            for i in range(5):          # quiff: thick locks rising at the front and swept back
-                x = -0.48 + i * 0.24
-                lk = blob(self.name + '_lock%d' % i, (x, -0.38, 1.5 + 0.06 * math.sin(i * 1.7)),
-                          (0.17, 0.48, 0.24), (hair, hair_l, hair_d)[i % 3], rot=(-0.75, 0, (i - 2) * 0.08))
+            for i in range(3):          # quiff: three big locks rising at the front and swept back
+                x = -0.4 + i * 0.4
+                lk = blob(self.name + '_lock%d' % i, (x, -0.3, 1.52 + (0.07 if i == 1 else 0)),
+                          (0.27, 0.62, 0.26), (hair, hair_l, hair)[i], rot=(-0.5, 0, (i - 1) * 0.1))
                 lk.parent = head
-            for i in range(4):
-                lk = blob(self.name + '_top%d' % i, (-0.36 + i * 0.24, 0.05, 1.5), (0.16, 0.5, 0.18),
-                          (hair_d, hair)[i % 2], rot=(-1.25, 0, 0))
+            for i in range(2):
+                lk = blob(self.name + '_top%d' % i, (-0.22 + i * 0.44, 0.22, 1.42), (0.3, 0.55, 0.2), hair_d,
+                          rot=(-1.3, 0, 0))
                 lk.parent = head
             for sx in (-1, 1):
-                side = box(self.name + '_side%d' % sx, (0.12, 0.95, 0.6), (sx * 0.66, 0.08, 0.92), hair, bevel=0.06)
+                side = box(self.name + '_side%d' % sx, (0.1, 0.6, 0.5), (sx * 0.64, 0.26, 0.95), hair, bevel=0.05)
                 side.parent = head
         elif kind == 'emo':
             hair = mat(self.name + '_hair', hexrgb('#0b0b0e'), 0.3)

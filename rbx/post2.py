@@ -75,7 +75,7 @@ def process(fr, img):
     t = (fr - 1) / FPS
     dx, dy = shake(t)
     zw, zh = int(W * Z), int(H * Z)
-    big = img.convert('RGB').resize((zw, zh), Image.LANCZOS)
+    big = img.convert('RGB').resize((zw, zh), Image.LANCZOS).filter(ImageFilter.UnsharpMask(3, 60, 2))
     mx, my = (zw - W) // 2, (zh - H) // 2
     ox = mx + int(max(-mx, min(mx, dx * 2)))
     oy = my + int(max(-my, min(my, dy * 2)))
@@ -86,6 +86,11 @@ def process(fr, img):
         s = int(4 + 14 * f)
         a[..., 0] = np.roll(a[..., 0], s, axis=1)
         a[..., 2] = np.roll(a[..., 2], -s, axis=1)
+    # bloom: bright plastic highlights, lamps and glow bleed softly (the 'cinematic toy' look)
+    hi = np.clip(a - 0.72, 0, 1) * 3.0
+    small = Image.fromarray((np.clip(hi, 0, 1) * 255).astype(np.uint8)).resize((W // 6, H // 6), Image.BILINEAR)
+    small = small.filter(ImageFilter.GaussianBlur(7))
+    a = a + np.asarray(small.resize((W, H), Image.BILINEAR), np.float32) / 255 * 0.55
     a = grade(a, t)
     a = a + rain_layer(t, 1.0) * np.array([0.75, 0.82, 1.0], np.float32) * 0.55
     a = a * VIG

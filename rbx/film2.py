@@ -1043,6 +1043,31 @@ def prep_world():
         L.data.energy = 9000
         L.data.color = (1.0, 0.62, 0.32)
         L.data.shadow_soft_size = 1.0
+    # wet asphalt: glossy puddles + fine bump, and worn road markings like a real street
+    am = bpy.data.materials['asphalt']
+    nt = am.node_tree
+    pb = nt.nodes['Principled BSDF']
+    for n in nt.nodes:
+        if n.type == 'MAP_RANGE':
+            n.inputs['To Min'].default_value = 0.04
+            n.inputs['To Max'].default_value = 0.6
+    n2 = nt.nodes.new('ShaderNodeTexNoise')
+    n2.inputs['Scale'].default_value = 60
+    n2.inputs['Detail'].default_value = 6
+    bump = nt.nodes.new('ShaderNodeBump')
+    bump.inputs['Strength'].default_value = 0.35
+    bump.inputs['Distance'].default_value = 0.05
+    nt.links.new(n2.outputs['Fac'], bump.inputs['Height'])
+    nt.links.new(bump.outputs['Normal'], pb.inputs['Normal'])
+    paint = chars.mat('roadpaint', (0.55, 0.55, 0.5), 0.35)
+    y = -96.0
+    while y < 26:
+        d = chars.box('dash', (0.35, 3.2, 0.02), (0, 0, 0.012), paint, bevel=0.0)
+        d.location = (0.6, y, 0)
+        y += 6.5
+    for sx in (-1, 1):
+        ln = chars.box('edge', (0.25, 80, 0.02), (0, 0, 0.012), paint, bevel=0.0)
+        ln.location = (sx * 8.2, -62, 0)
     for name, p in PIL.items():
         Wd.pillar(name, p, size=(2.6, 2.6, 9), grid=(2, 2, 6))
 
@@ -1054,7 +1079,7 @@ def lighting(c):
     sc.world = w
     w.use_nodes = True
     bg = w.node_tree.nodes['Background']
-    bg.inputs[0].default_value = (0.035, 0.05, 0.09, 1)
+    bg.inputs[0].default_value = (0.02, 0.03, 0.055, 1)
     bg.inputs[1].default_value = 1.0
     bpy.ops.object.light_add(type='SUN', rotation=(D(58), 0, D(205)))
     moon = bpy.context.object
@@ -1081,11 +1106,11 @@ def lighting(c):
         con.track_axis = 'TRACK_NEGATIVE_Z'
         con.up_axis = 'UP_Y'
         return L
-    rim = spot((0, 30, 16), 90000, (0.6, 0.75, 1.0), 75)
-    rim2 = spot((-24, -8, 11), 45000, (1.0, 0.6, 0.35), 65)
-    rim3 = spot((24, -10, 12), 30000, (0.55, 0.7, 1.0), 65)
-    for ob, a, b in ((moon, 5.0, 3.2), (fill, 5500, 3500), (rim, 90000, 40000), (rim2, 45000, 20000),
-                     (rim3, 30000, 22000)):
+    rim = spot((0, 30, 16), 170000, (0.55, 0.75, 1.0), 75)
+    rim2 = spot((-24, -8, 11), 80000, (1.0, 0.62, 0.35), 65)
+    rim3 = spot((24, -10, 12), 70000, (0.5, 0.72, 1.0), 65)
+    for ob, a, b in ((moon, 3.5, 2.2), (fill, 2600, 1800), (rim, 170000, 70000), (rim2, 80000, 30000),
+                     (rim3, 70000, 40000)):
         for t, e in ((T + 0.6, a), (T + 2.0, b)):
             ob.data.energy = e
             ob.data.keyframe_insert('energy', frame=F(t))
